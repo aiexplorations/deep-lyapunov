@@ -106,12 +106,15 @@ class TestAnalysisResults:
         assert reconstructed.lyapunov == sample_results.lyapunov
         assert reconstructed.behavior == sample_results.behavior
         assert reconstructed.n_trajectories == sample_results.n_trajectories
-        assert len(reconstructed.trajectory_metrics) == len(sample_results.trajectory_metrics)
+        assert len(reconstructed.trajectory_metrics) == len(
+            sample_results.trajectory_metrics
+        )
 
     def test_plot_trajectories(self, sample_results):
         """Test trajectory plotting."""
         import matplotlib
-        matplotlib.use('Agg')  # Non-interactive backend
+
+        matplotlib.use("Agg")  # Non-interactive backend
         import matplotlib.pyplot as plt
 
         fig = sample_results.plot_trajectories()
@@ -121,7 +124,8 @@ class TestAnalysisResults:
     def test_plot_trajectories_custom_components(self, sample_results):
         """Test trajectory plotting with custom components."""
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         fig = sample_results.plot_trajectories(components=(0, 1))
@@ -131,7 +135,8 @@ class TestAnalysisResults:
     def test_plot_convergence(self, sample_results):
         """Test convergence plotting."""
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         fig = sample_results.plot_convergence()
@@ -141,7 +146,8 @@ class TestAnalysisResults:
     def test_plot_lyapunov(self, sample_results):
         """Test Lyapunov plotting."""
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         fig = sample_results.plot_lyapunov()
@@ -151,7 +157,8 @@ class TestAnalysisResults:
     def test_save_report(self, sample_results):
         """Test report generation."""
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             sample_results.save_report(tmpdir)
@@ -232,7 +239,8 @@ class TestAnalysisResultsPlotting:
     def test_plot_with_existing_axes(self, minimal_results):
         """Test plotting on existing axes."""
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
@@ -243,7 +251,8 @@ class TestAnalysisResultsPlotting:
     def test_plot_convergence_with_axes(self, minimal_results):
         """Test convergence plot on existing axes."""
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
@@ -254,7 +263,8 @@ class TestAnalysisResultsPlotting:
     def test_plot_lyapunov_with_axes(self, minimal_results):
         """Test Lyapunov plot on existing axes."""
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
@@ -265,7 +275,8 @@ class TestAnalysisResultsPlotting:
     def test_plot_lyapunov_minimal_data(self):
         """Test Lyapunov plot with minimal data."""
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         results = AnalysisResults(

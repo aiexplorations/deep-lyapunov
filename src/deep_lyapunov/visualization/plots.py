@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import numpy as np
 
@@ -49,23 +49,34 @@ def plot_trajectories_2d(
     for i in range(n_trajectories):
         traj = pca_trajectories[:, i, :]
         ax.plot(
-            traj[:, c1], traj[:, c2],
-            color=colors[i], alpha=alpha, linewidth=1.5,
+            traj[:, c1],
+            traj[:, c2],
+            color=colors[i],
+            alpha=alpha,
+            linewidth=1.5,
             label=f"Trajectory {i+1}",
         )
 
         if show_endpoints:
             # Start point (circle)
             ax.scatter(
-                traj[0, c1], traj[0, c2],
-                color=colors[i], s=100, marker="o",
-                edgecolors="black", zorder=5,
+                traj[0, c1],
+                traj[0, c2],
+                color=colors[i],
+                s=100,
+                marker="o",
+                edgecolors="black",
+                zorder=5,
             )
             # End point (square)
             ax.scatter(
-                traj[-1, c1], traj[-1, c2],
-                color=colors[i], s=100, marker="s",
-                edgecolors="black", zorder=5,
+                traj[-1, c1],
+                traj[-1, c2],
+                color=colors[i],
+                s=100,
+                marker="s",
+                edgecolors="black",
+                zorder=5,
             )
 
     # Labels with variance info
@@ -118,17 +129,29 @@ def plot_trajectories_3d(
     for i in range(n_trajectories):
         traj = pca_trajectories[:, i, :]
         ax.plot(
-            traj[:, c1], traj[:, c2], traj[:, c3],
-            color=colors[i], alpha=alpha, linewidth=1.5,
+            traj[:, c1],
+            traj[:, c2],
+            traj[:, c3],
+            color=colors[i],
+            alpha=alpha,
+            linewidth=1.5,
         )
         # Start and end markers
         ax.scatter(
-            [traj[0, c1]], [traj[0, c2]], [traj[0, c3]],
-            color=colors[i], s=100, marker="o",
+            [traj[0, c1]],
+            [traj[0, c2]],
+            [traj[0, c3]],
+            color=colors[i],
+            s=100,
+            marker="o",
         )
         ax.scatter(
-            [traj[-1, c1]], [traj[-1, c2]], [traj[-1, c3]],
-            color=colors[i], s=100, marker="s",
+            [traj[-1, c1]],
+            [traj[-1, c2]],
+            [traj[-1, c3]],
+            color=colors[i],
+            s=100,
+            marker="s",
         )
 
     ax.set_xlabel(f"PC{c1+1}")
@@ -167,7 +190,9 @@ def plot_spread_evolution(
     color = "forestgreen" if behavior == "convergent" else "crimson"
 
     ax.plot(epochs, spread, color=color, linewidth=2)
-    ax.axhline(y=spread[0], color="gray", linestyle="--", alpha=0.7, label="Initial spread")
+    ax.axhline(
+        y=spread[0], color="gray", linestyle="--", alpha=0.7, label="Initial spread"
+    )
     ax.fill_between(epochs, spread, spread[0], alpha=0.2, color=color)
 
     ax.set_xlabel("Checkpoint")
@@ -206,7 +231,14 @@ def plot_lyapunov_evolution(
         fig = ax.get_figure()
 
     if len(spread) < 2:
-        ax.text(0.5, 0.5, "Insufficient data", ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "Insufficient data",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         return fig
 
     # Compute local Lyapunov
@@ -218,7 +250,10 @@ def plot_lyapunov_evolution(
     ax.bar(epochs, local_lyap, color=colors, alpha=0.7)
     ax.axhline(y=0, color="black", linestyle="-", linewidth=1)
     ax.axhline(
-        y=global_lyapunov, color="blue", linestyle="--", linewidth=2,
+        y=global_lyapunov,
+        color="blue",
+        linestyle="--",
+        linewidth=2,
         label=f"Mean λ = {global_lyapunov:.4f}",
     )
 
@@ -263,17 +298,27 @@ def plot_convergence_basin(
     # Initial points
     initial = pca_trajectories[0, :, :]
     ax.scatter(
-        initial[:, c1], initial[:, c2],
-        c="green", s=200, marker="o", alpha=0.7,
-        edgecolors="black", label="Initial points",
+        initial[:, c1],
+        initial[:, c2],
+        c="green",
+        s=200,
+        marker="o",
+        alpha=0.7,
+        edgecolors="black",
+        label="Initial points",
     )
 
     # Final points
     final = pca_trajectories[-1, :, :]
     ax.scatter(
-        final[:, c1], final[:, c2],
-        c="red", s=200, marker="*", alpha=0.7,
-        edgecolors="black", label="Final points",
+        final[:, c1],
+        final[:, c2],
+        c="red",
+        s=200,
+        marker="*",
+        alpha=0.7,
+        edgecolors="black",
+        label="Final points",
     )
 
     # Draw convex hulls if enough points
@@ -299,7 +344,9 @@ def plot_convergence_basin(
 
     ax.set_xlabel(f"PC{c1+1}")
     ax.set_ylabel(f"PC{c2+1}")
-    ax.set_title(f"Convergence Basin\nInit spread: {init_spread:.3f}, Final spread: {final_spread:.3f}")
+    ax.set_title(
+        f"Convergence Basin\nInit spread: {init_spread:.3f}, Final spread: {final_spread:.3f}"
+    )
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -340,7 +387,12 @@ def create_analysis_dashboard(
     plot_convergence_basin(pca_trajectories, pca_variance, ax=axes[0, 1])
 
     # Bottom-left: Spread evolution
-    plot_spread_evolution(spread_evolution, ax=axes[1, 0], behavior=behavior, convergence_ratio=convergence_ratio)
+    plot_spread_evolution(
+        spread_evolution,
+        ax=axes[1, 0],
+        behavior=behavior,
+        convergence_ratio=convergence_ratio,
+    )
 
     # Bottom-right: Lyapunov evolution
     plot_lyapunov_evolution(spread_evolution, lyapunov, ax=axes[1, 1])
@@ -348,7 +400,8 @@ def create_analysis_dashboard(
     plt.suptitle(
         f"Stability Analysis Dashboard\n"
         f"Convergence: {convergence_ratio:.2f}x | Lyapunov: {lyapunov:.4f} | {behavior.title()}",
-        fontsize=14, fontweight="bold",
+        fontsize=14,
+        fontweight="bold",
     )
     plt.tight_layout()
 

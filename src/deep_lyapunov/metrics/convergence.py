@@ -55,7 +55,7 @@ def compute_convergence_ratio(
 
     # Avoid division by zero
     if initial_spread <= 1e-10:
-        return 1.0 if final_spread <= 1e-10 else float('inf')
+        return 1.0 if final_spread <= 1e-10 else float("inf")
 
     return float(final_spread / initial_spread)
 
@@ -208,5 +208,5 @@ def compute_pairwise_distances(
     if len(points) < 2:
         return np.array([[0.0]])
 
-    distances = pdist(points, metric='euclidean')
+    distances = pdist(points, metric="euclidean")
     return squareform(distances)

@@ -59,9 +59,11 @@ def convergent_trajectory():
 
     # Converge toward origin over time
     for t in range(1, n_checkpoints):
-        decay = 0.8 ** t
+        decay = 0.8**t
         for i in range(n_trajectories):
-            trajectory[t, i, :] = trajectory[0, i, :] * decay + np.random.randn(n_params) * 0.01
+            trajectory[t, i, :] = (
+                trajectory[0, i, :] * decay + np.random.randn(n_params) * 0.01
+            )
 
     return trajectory
 
@@ -86,11 +88,11 @@ def divergent_trajectory():
 
     # Diverge over time
     for t in range(1, n_checkpoints):
-        growth = 1.2 ** t
+        growth = 1.2**t
         for i in range(n_trajectories):
             direction = np.random.randn(n_params)
             direction = direction / np.linalg.norm(direction)
-            trajectory[t, i, :] = trajectory[t-1, i, :] + direction * 0.1 * growth
+            trajectory[t, i, :] = trajectory[t - 1, i, :] + direction * 0.1 * growth
 
     return trajectory
 

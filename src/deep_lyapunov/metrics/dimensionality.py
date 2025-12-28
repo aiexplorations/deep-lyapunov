@@ -46,7 +46,7 @@ def compute_effective_dimensionality(
     step_size = max(1, window_size // 2)
     for i in range(0, n_checkpoints - window_size + 1, step_size):
         # Get window of data: flatten trajectories in window
-        window = trajectories[i:i + window_size, :, :]
+        window = trajectories[i : i + window_size, :, :]
         # Reshape to (window_size * n_trajectories, n_params)
         window_flat = window.reshape(-1, n_params)
 
@@ -118,12 +118,12 @@ def compute_participation_ratio(
 
     # Participation ratio
     sum_eig = np.sum(eigenvalues)
-    sum_eig_sq = np.sum(eigenvalues ** 2)
+    sum_eig_sq = np.sum(eigenvalues**2)
 
     if sum_eig_sq <= 0:
         return 1.0
 
-    pr = (sum_eig ** 2) / sum_eig_sq
+    pr = (sum_eig**2) / sum_eig_sq
 
     return float(pr)
 

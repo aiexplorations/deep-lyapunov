@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
 import numpy as np
 
@@ -133,9 +133,15 @@ class AnalysisResults:
                 zorder=5,
             )
 
-        ax.set_xlabel(f"PC{components[0]+1} ({self.pca_explained_variance[components[0]]:.1%} var)")
-        ax.set_ylabel(f"PC{components[1]+1} ({self.pca_explained_variance[components[1]]:.1%} var)")
-        ax.set_title(f"Weight Trajectories in PCA Space\n(Convergence: {self.convergence_ratio:.2f}x)")
+        ax.set_xlabel(
+            f"PC{components[0]+1} ({self.pca_explained_variance[components[0]]:.1%} var)"
+        )
+        ax.set_ylabel(
+            f"PC{components[1]+1} ({self.pca_explained_variance[components[1]]:.1%} var)"
+        )
+        ax.set_title(
+            f"Weight Trajectories in PCA Space\n(Convergence: {self.convergence_ratio:.2f}x)"
+        )
         ax.legend(loc="upper right", fontsize=8)
         ax.grid(True, alpha=0.3)
 

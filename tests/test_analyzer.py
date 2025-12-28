@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from deep_lyapunov import StabilityAnalyzer, AnalyzerConfig
+from deep_lyapunov import AnalyzerConfig, StabilityAnalyzer
 
 
 class TestStabilityAnalyzerInit:
@@ -187,6 +187,7 @@ class TestStabilityAnalyzerAnalyze:
     def stable_dataloader(self):
         """Create stable training data."""
         from torch.utils.data import DataLoader, TensorDataset
+
         torch.manual_seed(42)
         X = torch.randn(40, 4)
         y = torch.randn(40, 2)
@@ -196,6 +197,7 @@ class TestStabilityAnalyzerAnalyze:
     @pytest.fixture
     def simple_train_fn(self):
         """Create a simple training function."""
+
         def train_fn(model, train_loader, n_epochs, **kwargs):
             optimizer = torch.optim.SGD(model.parameters(), lr=0.001)  # Lower LR
             criterion = nn.MSELoss()
@@ -239,7 +241,9 @@ class TestStabilityAnalyzerAnalyze:
         assert results.convergence_ratio > 0
         assert results.n_parameters > 0
 
-    def test_analyze_with_training_metrics(self, stable_model, stable_dataloader, simple_train_fn):
+    def test_analyze_with_training_metrics(
+        self, stable_model, stable_dataloader, simple_train_fn
+    ):
         """Test that training metrics are captured."""
         analyzer = StabilityAnalyzer(
             stable_model,

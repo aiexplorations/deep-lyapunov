@@ -4,25 +4,25 @@ import numpy as np
 import pytest
 
 from deep_lyapunov.metrics import (
-    compute_lyapunov_exponent,
-    compute_local_lyapunov,
     compute_convergence_ratio,
+    compute_effective_dimensionality,
+    compute_local_lyapunov,
+    compute_lyapunov_exponent,
+    compute_participation_ratio,
     compute_spread_evolution,
     project_to_pca,
-    compute_effective_dimensionality,
-    compute_participation_ratio,
 )
-from deep_lyapunov.metrics.lyapunov import compute_lyapunov_from_trajectories
 from deep_lyapunov.metrics.convergence import (
-    interpolate_trajectories,
     compute_manifold_center,
     compute_pairwise_distances,
+    interpolate_trajectories,
 )
 from deep_lyapunov.metrics.dimensionality import (
     compute_cumulative_variance,
-    find_intrinsic_dimension,
     compute_local_dimensionality,
+    find_intrinsic_dimension,
 )
+from deep_lyapunov.metrics.lyapunov import compute_lyapunov_from_trajectories
 
 
 class TestLyapunovExponent:
@@ -218,7 +218,9 @@ class TestInterpolation:
 
     def test_no_change(self, mock_trajectory):
         """Test with same length."""
-        interpolated = interpolate_trajectories(mock_trajectory, mock_trajectory.shape[0])
+        interpolated = interpolate_trajectories(
+            mock_trajectory, mock_trajectory.shape[0]
+        )
         np.testing.assert_array_equal(interpolated, mock_trajectory)
 
     def test_none_target(self, mock_trajectory):

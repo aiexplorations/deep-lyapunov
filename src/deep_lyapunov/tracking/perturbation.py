@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     import torch
@@ -88,9 +88,7 @@ def create_perturbed_copies(
     for i in range(n_copies):
         # Deep copy the model architecture
         model_copy = copy.deepcopy(model)
-        model_copy.load_state_dict(
-            {k: v.clone() for k, v in base_state.items()}
-        )
+        model_copy.load_state_dict({k: v.clone() for k, v in base_state.items()})
 
         # Apply perturbation to all but the first (if include_original)
         if not include_original or i > 0:
@@ -131,9 +129,9 @@ def compute_perturbation_magnitude(
 
     for p1, p2 in zip(original.parameters(), perturbed.parameters()):
         diff = p1.detach() - p2.detach()
-        distance_sq += torch.sum(diff ** 2).item()
+        distance_sq += torch.sum(diff**2).item()
 
-    return float(distance_sq ** 0.5)
+    return float(distance_sq**0.5)
 
 
 def get_parameter_statistics(model: nn.Module) -> dict:

@@ -1,7 +1,10 @@
 """Tracking module for capturing weight trajectories."""
 
+from deep_lyapunov.tracking.perturbation import (
+    apply_perturbation,
+    create_perturbed_copies,
+)
 from deep_lyapunov.tracking.tracker import TrajectoryTracker
-from deep_lyapunov.tracking.perturbation import apply_perturbation, create_perturbed_copies
 
 __all__ = [
     "TrajectoryTracker",

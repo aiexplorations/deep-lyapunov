@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Literal, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional
 
 import numpy as np
 
 from deep_lyapunov.config import AnalyzerConfig
-from deep_lyapunov.results import AnalysisResults, TrajectoryMetrics
-from deep_lyapunov.tracking import TrajectoryTracker, create_perturbed_copies
 from deep_lyapunov.metrics import (
     compute_convergence_ratio,
-    compute_spread_evolution,
-    compute_lyapunov_exponent,
-    project_to_pca,
     compute_effective_dimensionality,
+    compute_lyapunov_exponent,
     compute_participation_ratio,
+    compute_spread_evolution,
+    project_to_pca,
 )
+from deep_lyapunov.results import AnalysisResults, TrajectoryMetrics
+from deep_lyapunov.tracking import TrajectoryTracker, create_perturbed_copies
 
 if TYPE_CHECKING:
     import torch
@@ -177,7 +177,9 @@ class StabilityAnalyzer:
         import torch
 
         if self._config.verbose:
-            print(f"Starting stability analysis with {self._config.n_trajectories} trajectories")
+            print(
+                f"Starting stability analysis with {self._config.n_trajectories} trajectories"
+            )
 
         # Set seed for reproducibility
         torch.manual_seed(self._config.seed)
@@ -217,8 +219,13 @@ class StabilityAnalyzer:
 
             # Train with checkpoint recording
             result = self._train_with_recording(
-                model, tracker, train_fn, train_loader, n_epochs,
-                test_loader=test_loader, **train_kwargs
+                model,
+                tracker,
+                train_fn,
+                train_loader,
+                n_epochs,
+                test_loader=test_loader,
+                **train_kwargs,
             )
             training_metrics.append(result)
 
@@ -254,13 +261,25 @@ class StabilityAnalyzer:
 
             # Extract metrics
             if "loss" in result:
-                loss = result["loss"][-1] if isinstance(result["loss"], list) else result["loss"]
+                loss = (
+                    result["loss"][-1]
+                    if isinstance(result["loss"], list)
+                    else result["loss"]
+                )
                 history["loss"].append(loss)
             if "accuracy" in result:
-                acc = result["accuracy"][-1] if isinstance(result["accuracy"], list) else result["accuracy"]
+                acc = (
+                    result["accuracy"][-1]
+                    if isinstance(result["accuracy"], list)
+                    else result["accuracy"]
+                )
                 history["accuracy"].append(acc)
             elif "test_acc" in result:
-                acc = result["test_acc"][-1] if isinstance(result["test_acc"], list) else result["test_acc"]
+                acc = (
+                    result["test_acc"][-1]
+                    if isinstance(result["test_acc"], list)
+                    else result["test_acc"]
+                )
                 history["accuracy"].append(acc)
 
             # Capture checkpoint
