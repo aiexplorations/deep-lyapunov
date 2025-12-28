@@ -168,8 +168,8 @@ If you use deep-lyapunov in your research, please cite:
 ```bibtex
 @software{deep_lyapunov,
   title = {deep-lyapunov: Neural Network Training Stability Analysis},
-  author = {Venkatasubramanian, Rajesh},
-  year = {2024},
+  author = {Sampathkumar, Rajesh},
+  year = {2025},
   url = {https://github.com/aiexplorations/deep-lyapunov}
 }
 ```
