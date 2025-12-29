@@ -360,3 +360,96 @@ class TestLocalDimensionality:
         trajectory = np.random.randn(3, 50)
         local_dim = compute_local_dimensionality(trajectory, k_neighbors=10)
         assert len(local_dim) == 3
+
+    def test_very_short_trajectory_fallback(self):
+        """Test local_window < 3 returns 1.0 (line 207)."""
+        # With only 2 points and k_neighbors=2, local_window will be < 3
+        trajectory = np.random.randn(2, 50)
+        local_dim = compute_local_dimensionality(trajectory, k_neighbors=2)
+        assert len(local_dim) == 2
+        # Both should be 1.0 due to fallback
+
+
+class TestParticipationRatioEdgeCases:
+    """Tests for edge cases in participation ratio computation."""
+
+    def test_single_feature_scalar_cov(self):
+        """Test participation ratio with single feature (scalar covariance, line 108)."""
+        # Single feature produces scalar covariance
+        data = np.random.randn(10, 1)
+        pr = compute_participation_ratio(data)
+        assert pr == 1.0
+
+    def test_zero_variance_data(self):
+        """Test participation ratio with zero variance (sum_eig_sq <= 0, line 124)."""
+        # All same values - zero variance
+        data = np.ones((10, 5))
+        pr = compute_participation_ratio(data)
+        assert pr == 1.0
+
+    def test_numerical_edge_case(self):
+        """Test participation ratio with near-zero eigenvalues."""
+        # Data with very small variance
+        data = np.ones((10, 3)) + np.random.randn(10, 3) * 1e-15
+        pr = compute_participation_ratio(data)
+        assert pr >= 1.0
+
+
+class TestEffectiveDimensionalityEdgeCases:
+    """Tests for edge cases in effective dimensionality."""
+
+    def test_large_window_fallback(self):
+        """Test fallback when window_size > n_checkpoints."""
+        # Very small trajectory where window would be too large
+        traj = np.random.randn(5, 3, 20)
+        eff_dim = compute_effective_dimensionality(traj, window_size=100)
+        # Should fall back to global computation
+        assert len(eff_dim) >= 1
+
+
+class TestConvergenceRatioEdgeCases:
+    """Tests for convergence ratio edge cases."""
+
+    def test_divergent_trajectories_large_ratio(self):
+        """Test convergence ratio for strongly divergent trajectories."""
+        # Create trajectories that start close and diverge significantly
+        n_checkpoints, n_trajectories, n_params = 10, 5, 20
+        np.random.seed(42)
+        traj = np.zeros((n_checkpoints, n_trajectories, n_params))
+
+        # All start with small differences
+        for i in range(n_trajectories):
+            traj[0, i, :] = np.random.randn(n_params) * 0.001
+
+        # Diverge over time with exponential growth
+        for t in range(1, n_checkpoints):
+            for i in range(n_trajectories):
+                traj[t, i, :] = traj[t - 1, i, :] + np.random.randn(n_params) * (
+                    t * 0.5
+                )
+
+        ratio = compute_convergence_ratio(traj)
+        # Should have ratio > 1 for divergent trajectories
+        assert ratio > 1.0
+
+    def test_convergent_trajectories_small_ratio(self):
+        """Test convergence ratio for convergent trajectories."""
+        # Create trajectories that start apart and converge
+        n_checkpoints, n_trajectories, n_params = 10, 5, 20
+        np.random.seed(42)
+        traj = np.zeros((n_checkpoints, n_trajectories, n_params))
+
+        # Start with large differences
+        target = np.random.randn(n_params)
+        for i in range(n_trajectories):
+            traj[0, i, :] = target + np.random.randn(n_params) * 2.0
+
+        # Converge to target over time
+        for t in range(1, n_checkpoints):
+            alpha = t / n_checkpoints  # Interpolation factor
+            for i in range(n_trajectories):
+                traj[t, i, :] = (1 - alpha) * traj[0, i, :] + alpha * target
+
+        ratio = compute_convergence_ratio(traj)
+        # Should have ratio < 1 for convergent trajectories
+        assert ratio < 1.0

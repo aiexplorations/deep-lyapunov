@@ -264,6 +264,123 @@ class TestStabilityAnalyzerAnalyze:
         for tm in results.trajectory_metrics:
             assert tm.final_loss is not None or tm.path_length >= 0
 
+    def test_analyze_verbose_output(self, stable_model, stable_dataloader, capsys):
+        """Test verbose output during analyze (lines 180, 218)."""
+
+        def simple_train_fn(model, train_loader, n_epochs, **kwargs):
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
+            criterion = nn.MSELoss()
+            losses = []
+            for _ in range(n_epochs):
+                epoch_loss = 0.0
+                for X, y in train_loader:
+                    optimizer.zero_grad()
+                    output = model(X)
+                    loss = criterion(output, y)
+                    loss.backward()
+                    optimizer.step()
+                    epoch_loss += loss.item()
+                losses.append(epoch_loss / len(train_loader))
+            return {"loss": losses}
+
+        analyzer = StabilityAnalyzer(
+            stable_model,
+            device="cpu",
+            verbose=True,  # Enable verbose
+            n_trajectories=2,
+            perturbation_scale=0.001,
+        )
+
+        results = analyzer.analyze(
+            train_fn=simple_train_fn,
+            train_loader=stable_dataloader,
+            n_epochs=2,
+        )
+
+        captured = capsys.readouterr()
+        # Check verbose output from analyze()
+        assert "Starting stability analysis" in captured.out
+        assert "Training trajectory" in captured.out
+        assert "Analysis complete" in captured.out
+
+    def test_analyze_with_accuracy_metrics(self, stable_model, stable_dataloader):
+        """Test analyze with accuracy in training results (lines 271-276)."""
+
+        def train_fn_with_accuracy(model, train_loader, n_epochs, **kwargs):
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
+            criterion = nn.MSELoss()
+            losses = []
+            accuracies = []
+            for _ in range(n_epochs):
+                epoch_loss = 0.0
+                for X, y in train_loader:
+                    optimizer.zero_grad()
+                    output = model(X)
+                    loss = criterion(output, y)
+                    loss.backward()
+                    optimizer.step()
+                    epoch_loss += loss.item()
+                losses.append(epoch_loss / len(train_loader))
+                accuracies.append(0.8 + len(losses) * 0.05)  # Fake accuracy
+            return {"loss": losses, "accuracy": accuracies}
+
+        analyzer = StabilityAnalyzer(
+            stable_model,
+            device="cpu",
+            verbose=False,
+            n_trajectories=2,
+            perturbation_scale=0.001,
+        )
+
+        results = analyzer.analyze(
+            train_fn=train_fn_with_accuracy,
+            train_loader=stable_dataloader,
+            n_epochs=2,
+        )
+
+        # Check that accuracy was captured
+        for tm in results.trajectory_metrics:
+            assert tm.final_accuracy is not None
+
+    def test_analyze_with_test_acc_metrics(self, stable_model, stable_dataloader):
+        """Test analyze with test_acc in training results (lines 278-283)."""
+
+        def train_fn_with_test_acc(model, train_loader, n_epochs, **kwargs):
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
+            criterion = nn.MSELoss()
+            losses = []
+            test_accs = []
+            for _ in range(n_epochs):
+                epoch_loss = 0.0
+                for X, y in train_loader:
+                    optimizer.zero_grad()
+                    output = model(X)
+                    loss = criterion(output, y)
+                    loss.backward()
+                    optimizer.step()
+                    epoch_loss += loss.item()
+                losses.append(epoch_loss / len(train_loader))
+                test_accs.append(0.75 + len(losses) * 0.05)  # Fake test_acc
+            return {"loss": losses, "test_acc": test_accs}
+
+        analyzer = StabilityAnalyzer(
+            stable_model,
+            device="cpu",
+            verbose=False,
+            n_trajectories=2,
+            perturbation_scale=0.001,
+        )
+
+        results = analyzer.analyze(
+            train_fn=train_fn_with_test_acc,
+            train_loader=stable_dataloader,
+            n_epochs=2,
+        )
+
+        # Check that test_acc was captured as accuracy
+        for tm in results.trajectory_metrics:
+            assert tm.final_accuracy is not None
+
 
 class TestStabilityAnalyzerHelpers:
     """Tests for helper methods."""
@@ -338,3 +455,130 @@ class TestStabilityAnalyzerVerbose:
 
         captured = capsys.readouterr()
         assert captured.out == ""
+
+    def test_verbose_reset(self, simple_model, capsys):
+        """Test verbose output during reset."""
+        analyzer = StabilityAnalyzer(simple_model, device="cpu", verbose=True)
+        analyzer.start_recording()
+        capsys.readouterr()  # Clear previous output
+
+        analyzer.reset()
+        captured = capsys.readouterr()
+        assert "Analyzer reset" in captured.out
+
+    def test_verbose_compute_metrics(self, simple_model, capsys):
+        """Test verbose output during compute_metrics."""
+        analyzer = StabilityAnalyzer(
+            simple_model,
+            device="cpu",
+            verbose=True,
+            n_trajectories=3,
+        )
+        analyzer.start_recording()
+        capsys.readouterr()  # Clear previous output
+
+        # Record several checkpoints with weight modifications
+        for _ in range(3):
+            with torch.no_grad():
+                for model in analyzer.get_models():
+                    for param in model.parameters():
+                        param.add_(torch.randn_like(param) * 0.01)
+            analyzer.record_checkpoint()
+
+        results = analyzer.compute_metrics()
+        captured = capsys.readouterr()
+
+        assert "Analysis complete" in captured.out
+        assert "Convergence ratio" in captured.out
+        assert "Lyapunov exponent" in captured.out
+
+
+class TestStabilityAnalyzerTrainingMetrics:
+    """Tests for training metrics extraction."""
+
+    def test_extract_accuracy_from_training_results(self, simple_model):
+        """Test extracting accuracy from training results."""
+        analyzer = StabilityAnalyzer(
+            simple_model,
+            device="cpu",
+            verbose=False,
+            n_trajectories=2,
+        )
+        analyzer.start_recording()
+
+        # Record checkpoints
+        for _ in range(3):
+            with torch.no_grad():
+                for model in analyzer.get_models():
+                    for param in model.parameters():
+                        param.add_(torch.randn_like(param) * 0.01)
+            analyzer.record_checkpoint()
+
+        # Test with accuracy in training_metrics
+        training_metrics = [
+            {"loss": [0.5, 0.4], "accuracy": [0.8, 0.85]},
+            {"loss": [0.6, 0.45], "accuracy": [0.75, 0.82]},
+        ]
+
+        metrics = analyzer._compute_trajectory_metrics(training_metrics)
+        assert metrics[0].final_accuracy == 0.85
+        assert metrics[1].final_accuracy == 0.82
+
+    def test_extract_no_accuracy_from_training_results(self, simple_model):
+        """Test when training metrics have no accuracy."""
+        analyzer = StabilityAnalyzer(
+            simple_model,
+            device="cpu",
+            verbose=False,
+            n_trajectories=2,
+        )
+        analyzer.start_recording()
+
+        # Record checkpoints
+        for _ in range(3):
+            with torch.no_grad():
+                for model in analyzer.get_models():
+                    for param in model.parameters():
+                        param.add_(torch.randn_like(param) * 0.01)
+            analyzer.record_checkpoint()
+
+        # Test with only loss, no accuracy
+        training_metrics = [
+            {"loss": [0.5, 0.4]},
+            {"loss": [0.6, 0.45]},
+        ]
+
+        metrics = analyzer._compute_trajectory_metrics(training_metrics)
+        assert metrics[0].final_loss == 0.4
+        assert metrics[0].final_accuracy is None
+        assert metrics[1].final_loss == 0.45
+
+    def test_extract_empty_loss_list(self, simple_model):
+        """Test extracting metrics when loss list is empty."""
+        analyzer = StabilityAnalyzer(
+            simple_model,
+            device="cpu",
+            verbose=False,
+            n_trajectories=2,
+        )
+        analyzer.start_recording()
+
+        # Record checkpoints
+        for _ in range(3):
+            with torch.no_grad():
+                for model in analyzer.get_models():
+                    for param in model.parameters():
+                        param.add_(torch.randn_like(param) * 0.01)
+            analyzer.record_checkpoint()
+
+        # Test with empty lists (should not crash)
+        training_metrics = [
+            {"loss": [], "accuracy": []},
+            {"loss": [0.35], "accuracy": [0.88]},
+        ]
+
+        metrics = analyzer._compute_trajectory_metrics(training_metrics)
+        # Empty list is falsy, so final_loss should be None
+        assert metrics[0].final_loss is None
+        assert metrics[1].final_loss == 0.35
+        assert metrics[1].final_accuracy == 0.88

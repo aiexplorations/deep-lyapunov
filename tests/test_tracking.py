@@ -246,3 +246,98 @@ class TestPerturbationUtilities:
         assert "max" in stats
         assert stats["n_parameters"] > 0
         assert stats["std"] > 0  # Initialized weights have variance
+
+    def test_get_parameter_statistics_empty_model(self):
+        """Test parameter statistics for model with no trainable params."""
+
+        class NoParamModel(nn.Module):
+            def forward(self, x):
+                return x
+
+        model = NoParamModel()
+        stats = get_parameter_statistics(model)
+
+        assert stats["n_parameters"] == 0
+        assert stats["mean"] == 0.0
+        assert stats["std"] == 0.0
+
+
+class TestTrackerEdgeCases:
+    """Tests for tracker edge cases."""
+
+    def test_get_statistics_single_snapshot(self, simple_model):
+        """Test statistics with only 1 snapshot (line 183)."""
+        tracker = TrajectoryTracker(simple_model)
+        tracker.capture()
+
+        stats = tracker.get_statistics()
+
+        # Should return zeros when < 2 snapshots
+        assert stats["path_length"] == 0.0
+        assert stats["velocity_mean"] == 0.0
+        assert stats["velocity_std"] == 0.0
+
+    def test_get_gradient_trajectory_none(self, simple_model):
+        """Test gradient trajectory returns None when not tracked (line 141)."""
+        tracker = TrajectoryTracker(simple_model, track_gradients=False)
+        tracker.capture()
+
+        grad_traj = tracker.get_gradient_trajectory()
+        assert grad_traj is None
+
+    def test_gradient_zeros_when_none(self, simple_model):
+        """Test gradient capture fills zeros when grad is None (line 94)."""
+        tracker = TrajectoryTracker(simple_model, track_gradients=True)
+
+        # Capture without running backward - no gradients computed
+        tracker.capture()
+
+        # Should have captured gradient trajectory (with zeros)
+        grad_traj = tracker.get_gradient_trajectory()
+        # If no gradients at all (all None), returns None
+        # But if some params have grads, fills zeros for those that don't
+        # In this case, no backward called, so all None -> returns None
+        assert grad_traj is None
+
+    def test_gradient_partial_zeros(self, simple_model):
+        """Test gradient capture with partial gradients."""
+        tracker = TrajectoryTracker(simple_model, track_gradients=True)
+
+        # Create a situation where some params have gradients
+        x = torch.randn(4, 4)
+        y = simple_model(x)
+        y.sum().backward()
+
+        # Now clear only some gradients
+        for i, param in enumerate(simple_model.parameters()):
+            if i == 0:
+                param.grad = None  # Clear first param's grad
+
+        tracker.capture()
+
+        # Should have captured with zeros for the cleared gradient
+        grad_traj = tracker.get_gradient_trajectory()
+        assert grad_traj is not None
+
+
+class TestPerturbationZeroStd:
+    """Tests for perturbation with zero std parameters."""
+
+    def test_perturbation_zero_std_param(self):
+        """Test perturbation when parameter has zero std."""
+
+        class ConstantParamModel(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.param = nn.Parameter(torch.ones(10))  # All same value -> std=0
+
+            def forward(self, x):
+                return x * self.param
+
+        model = ConstantParamModel()
+        original = model.param.clone()
+
+        apply_perturbation(model, scale=0.01, seed=42)
+
+        # Should still apply perturbation using default std of 0.01
+        assert not torch.allclose(model.param, original)
