@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deep-lyapunov"
-version = "0.1.1"
+version = "0.1.2"
 description = "Analyze neural network training stability using Lyapunov exponents and perturbation-based trajectory analysis"
 readme = "README.md"
 license = {text = "MIT"}

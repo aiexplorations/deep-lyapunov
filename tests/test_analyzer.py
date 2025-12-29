@@ -264,8 +264,9 @@ class TestStabilityAnalyzerAnalyze:
         for tm in results.trajectory_metrics:
             assert tm.final_loss is not None or tm.path_length >= 0
 
-    def test_analyze_verbose_output(self, stable_model, stable_dataloader, capsys):
-        """Test verbose output during analyze (lines 180, 218)."""
+    def test_analyze_logging_output(self, stable_model, stable_dataloader, caplog):
+        """Test logging output during analyze."""
+        import logging
 
         def simple_train_fn(model, train_loader, n_epochs, **kwargs):
             optimizer = torch.optim.SGD(model.parameters(), lr=0.001)
@@ -286,22 +287,23 @@ class TestStabilityAnalyzerAnalyze:
         analyzer = StabilityAnalyzer(
             stable_model,
             device="cpu",
-            verbose=True,  # Enable verbose
+            verbose=True,
             n_trajectories=2,
             perturbation_scale=0.001,
         )
 
-        results = analyzer.analyze(
-            train_fn=simple_train_fn,
-            train_loader=stable_dataloader,
-            n_epochs=2,
-        )
+        with caplog.at_level(logging.INFO, logger="deep_lyapunov"):
+            results = analyzer.analyze(
+                train_fn=simple_train_fn,
+                train_loader=stable_dataloader,
+                n_epochs=2,
+            )
 
-        captured = capsys.readouterr()
-        # Check verbose output from analyze()
-        assert "Starting stability analysis" in captured.out
-        assert "Training trajectory" in captured.out
-        assert "Analysis complete" in captured.out
+        # Check logging output from analyze()
+        log_text = caplog.text
+        assert "Starting stability analysis" in log_text
+        assert "Training trajectory" in log_text
+        assert "Analysis complete" in log_text
 
     def test_analyze_with_accuracy_metrics(self, stable_model, stable_dataloader):
         """Test analyze with accuracy in training results (lines 271-276)."""
@@ -437,37 +439,37 @@ class TestStabilityAnalyzerHelpers:
         assert metrics[1].final_loss == 0.35
 
 
-class TestStabilityAnalyzerVerbose:
-    """Tests for verbose mode."""
+class TestStabilityAnalyzerLogging:
+    """Tests for logging output."""
 
-    def test_verbose_output(self, simple_model, capsys):
-        """Test that verbose mode produces output."""
+    def test_logging_on_start_recording(self, simple_model, caplog):
+        """Test that logging produces output on start_recording."""
+        import logging
+
+        analyzer = StabilityAnalyzer(simple_model, device="cpu", verbose=True)
+
+        with caplog.at_level(logging.INFO, logger="deep_lyapunov"):
+            analyzer.start_recording()
+
+        assert "Recording started" in caplog.text
+
+    def test_logging_on_reset(self, simple_model, caplog):
+        """Test logging output during reset."""
+        import logging
+
         analyzer = StabilityAnalyzer(simple_model, device="cpu", verbose=True)
         analyzer.start_recording()
+        caplog.clear()
 
-        captured = capsys.readouterr()
-        assert "Recording started" in captured.out
+        with caplog.at_level(logging.INFO, logger="deep_lyapunov"):
+            analyzer.reset()
 
-    def test_silent_mode(self, simple_model, capsys):
-        """Test that silent mode produces no output."""
-        analyzer = StabilityAnalyzer(simple_model, device="cpu", verbose=False)
-        analyzer.start_recording()
+        assert "Analyzer reset" in caplog.text
 
-        captured = capsys.readouterr()
-        assert captured.out == ""
+    def test_logging_on_compute_metrics(self, simple_model, caplog):
+        """Test logging output during compute_metrics."""
+        import logging
 
-    def test_verbose_reset(self, simple_model, capsys):
-        """Test verbose output during reset."""
-        analyzer = StabilityAnalyzer(simple_model, device="cpu", verbose=True)
-        analyzer.start_recording()
-        capsys.readouterr()  # Clear previous output
-
-        analyzer.reset()
-        captured = capsys.readouterr()
-        assert "Analyzer reset" in captured.out
-
-    def test_verbose_compute_metrics(self, simple_model, capsys):
-        """Test verbose output during compute_metrics."""
         analyzer = StabilityAnalyzer(
             simple_model,
             device="cpu",
@@ -475,7 +477,7 @@ class TestStabilityAnalyzerVerbose:
             n_trajectories=3,
         )
         analyzer.start_recording()
-        capsys.readouterr()  # Clear previous output
+        caplog.clear()
 
         # Record several checkpoints with weight modifications
         for _ in range(3):
@@ -485,12 +487,30 @@ class TestStabilityAnalyzerVerbose:
                         param.add_(torch.randn_like(param) * 0.01)
             analyzer.record_checkpoint()
 
-        results = analyzer.compute_metrics()
-        captured = capsys.readouterr()
+        with caplog.at_level(logging.INFO, logger="deep_lyapunov"):
+            results = analyzer.compute_metrics()
 
-        assert "Analysis complete" in captured.out
-        assert "Convergence ratio" in captured.out
-        assert "Lyapunov exponent" in captured.out
+        log_text = caplog.text
+        assert "Analysis complete" in log_text
+        assert "convergence_ratio" in log_text
+        assert "lyapunov" in log_text
+
+    def test_debug_logging(self, simple_model, caplog):
+        """Test that debug level provides more details."""
+        import logging
+
+        analyzer = StabilityAnalyzer(
+            simple_model,
+            device="cpu",
+            n_trajectories=2,
+        )
+
+        with caplog.at_level(logging.DEBUG, logger="deep_lyapunov"):
+            analyzer.start_recording()
+
+        # Debug should include more detailed info
+        log_text = caplog.text
+        assert "perturbed model copies" in log_text or "parameters" in log_text
 
 
 class TestStabilityAnalyzerTrainingMetrics:

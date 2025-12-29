@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Optional, Tuple
 
 import numpy as np
 from sklearn.decomposition import PCA
+
+# Module-level logger
+logger = logging.getLogger(__name__)
 
 
 def compute_convergence_ratio(
@@ -36,7 +40,13 @@ def compute_convergence_ratio(
     """
     n_checkpoints, n_trajectories, n_params = trajectories.shape
 
+    logger.debug(
+        f"Computing convergence ratio: {n_checkpoints} checkpoints, "
+        f"{n_trajectories} trajectories, {n_params} parameters"
+    )
+
     if n_trajectories < 2:
+        logger.warning("Single trajectory provided, convergence ratio = 1.0")
         return 1.0
 
     # Project to PCA space for more meaningful spread calculation
@@ -55,9 +65,18 @@ def compute_convergence_ratio(
 
     # Avoid division by zero
     if initial_spread <= 1e-10:
+        logger.debug(
+            f"Very small initial spread ({initial_spread:.2e}), "
+            f"final spread = {final_spread:.2e}"
+        )
         return 1.0 if final_spread <= 1e-10 else float("inf")
 
-    return float(final_spread / initial_spread)
+    ratio = float(final_spread / initial_spread)
+    logger.debug(
+        f"Spread: initial={initial_spread:.4f}, final={final_spread:.4f}, "
+        f"ratio={ratio:.4f}"
+    )
+    return ratio
 
 
 def compute_spread_evolution(

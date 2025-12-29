@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import copy
+import logging
 from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
     import torch
     import torch.nn as nn
+
+# Module-level logger
+logger = logging.getLogger(__name__)
 
 
 def apply_perturbation(
@@ -81,6 +85,11 @@ def create_perturbed_copies(
     """
     import torch
 
+    logger.debug(
+        f"Creating {n_copies} perturbed copies (scale={scale}, "
+        f"include_original={include_original})"
+    )
+
     # Get base state
     base_state = {k: v.clone() for k, v in model.state_dict().items()}
     copies = []
@@ -94,9 +103,13 @@ def create_perturbed_copies(
         if not include_original or i > 0:
             seed = base_seed + i
             apply_perturbation(model_copy, scale=scale, seed=seed)
+            logger.debug(f"  Copy {i}: perturbed with seed={seed}")
+        else:
+            logger.debug(f"  Copy {i}: unperturbed (original)")
 
         copies.append(model_copy)
 
+    logger.debug(f"Created {len(copies)} model copies")
     return copies
 
 

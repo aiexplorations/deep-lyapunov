@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional
 
 import numpy as np
@@ -22,6 +23,9 @@ if TYPE_CHECKING:
     import torch
     import torch.nn as nn
     from torch.utils.data import DataLoader
+
+# Module-level logger
+logger = logging.getLogger(__name__)
 
 
 class StabilityAnalyzer:
@@ -113,6 +117,14 @@ class StabilityAnalyzer:
         # Resolve device
         self._device = self._resolve_device(self._config.device)
 
+        # Log initialization
+        logger.debug(
+            "StabilityAnalyzer initialized: "
+            f"n_trajectories={self._config.n_trajectories}, "
+            f"perturbation_scale={self._config.perturbation_scale}, "
+            f"device={self._device}"
+        )
+
     def _resolve_device(self, device: str) -> str:
         """Resolve 'auto' device to actual device."""
         if device != "auto":
@@ -176,15 +188,20 @@ class StabilityAnalyzer:
         """
         import torch
 
-        if self._config.verbose:
-            print(
-                f"Starting stability analysis with {self._config.n_trajectories} trajectories"
-            )
+        logger.info(
+            f"Starting stability analysis: {self._config.n_trajectories} trajectories, "
+            f"{n_epochs} epochs"
+        )
+        logger.debug(
+            f"Analysis config: perturbation_scale={self._config.perturbation_scale}, "
+            f"seed={self._config.seed}, device={self._device}"
+        )
 
         # Set seed for reproducibility
         torch.manual_seed(self._config.seed)
 
         # Create perturbed model copies
+        logger.debug("Creating perturbed model copies...")
         self._models = create_perturbed_copies(
             self._base_model,
             n_copies=self._config.n_trajectories,
@@ -196,6 +213,7 @@ class StabilityAnalyzer:
         # Move models to device
         for model in self._models:
             model.to(self._device)
+        logger.debug(f"Models moved to device: {self._device}")
 
         # Create trackers for each model
         self._trackers = [
@@ -206,16 +224,17 @@ class StabilityAnalyzer:
             )
             for model in self._models
         ]
+        logger.debug(f"Created {len(self._trackers)} trajectory trackers")
 
         # Record initial state
         for tracker in self._trackers:
             tracker.capture()
+        logger.debug("Captured initial weight state for all trajectories")
 
         # Train each model
         training_metrics = []
         for i, (model, tracker) in enumerate(zip(self._models, self._trackers)):
-            if self._config.verbose:
-                print(f"  Training trajectory {i+1}/{self._config.n_trajectories}...")
+            logger.info(f"Training trajectory {i + 1}/{self._config.n_trajectories}...")
 
             # Train with checkpoint recording
             result = self._train_with_recording(
@@ -229,9 +248,20 @@ class StabilityAnalyzer:
             )
             training_metrics.append(result)
 
+            # Log training result summary
+            if result.get("loss"):
+                final_loss = result["loss"][-1] if result["loss"] else None
+                logger.debug(
+                    f"Trajectory {i + 1} complete: final_loss={final_loss:.4f}"
+                    if final_loss
+                    else f"Trajectory {i + 1} complete"
+                )
+
         self._n_checkpoints = self._trackers[0].n_snapshots
+        logger.debug(f"Training complete: {self._n_checkpoints} checkpoints recorded")
 
         # Compute metrics
+        logger.info("Computing stability metrics...")
         return self.compute_metrics(training_metrics)
 
     def _train_with_recording(
@@ -285,6 +315,13 @@ class StabilityAnalyzer:
             # Capture checkpoint
             tracker.capture()
 
+            # Log epoch progress at DEBUG level
+            loss_str = f"loss={history['loss'][-1]:.4f}" if history["loss"] else ""
+            acc_str = (
+                f", acc={history['accuracy'][-1]:.4f}" if history["accuracy"] else ""
+            )
+            logger.debug(f"  Epoch {epoch + 1}/{n_epochs}: {loss_str}{acc_str}")
+
         return history
 
     def start_recording(self) -> None:
@@ -305,6 +342,11 @@ class StabilityAnalyzer:
         if self._is_recording:
             raise RuntimeError("Already recording. Call reset() first.")
 
+        logger.info(
+            f"Starting manual recording: {self._config.n_trajectories} trajectories, "
+            f"perturbation_scale={self._config.perturbation_scale}"
+        )
+
         torch.manual_seed(self._config.seed)
 
         # Create perturbed copies
@@ -315,6 +357,7 @@ class StabilityAnalyzer:
             base_seed=self._config.seed,
             include_original=True,
         )
+        logger.debug(f"Created {len(self._models)} perturbed model copies")
 
         # Move to device
         for model in self._models:
@@ -337,8 +380,8 @@ class StabilityAnalyzer:
         self._is_recording = True
         self._n_checkpoints = 1
 
-        if self._config.verbose:
-            print(f"Recording started with {self._config.n_trajectories} trajectories")
+        n_params = self._trackers[0].n_parameters
+        logger.info(f"Recording started: tracking {n_params:,} parameters")
 
     def record_checkpoint(self) -> None:
         """Record current weight state of all model copies.
@@ -355,6 +398,7 @@ class StabilityAnalyzer:
             tracker.capture()
 
         self._n_checkpoints += 1
+        logger.debug(f"Checkpoint {self._n_checkpoints} recorded")
 
     def get_models(self) -> List[nn.Module]:
         """Get the list of perturbed model copies.
@@ -440,11 +484,27 @@ class StabilityAnalyzer:
             n_parameters=n_params,
         )
 
-        if self._config.verbose:
-            print(f"Analysis complete:")
-            print(f"  Convergence ratio: {convergence_ratio:.3f}x")
-            print(f"  Lyapunov exponent: {lyapunov:.4f}")
-            print(f"  Behavior: {behavior}")
+        # Log comprehensive results
+        logger.info(
+            f"Analysis complete: convergence_ratio={convergence_ratio:.3f}x, "
+            f"lyapunov={lyapunov:.4f}, behavior={behavior}"
+        )
+        logger.debug(
+            f"Additional metrics: effective_dim={effective_dim:.2f}, "
+            f"n_checkpoints={self._n_checkpoints}, n_params={n_params:,}"
+        )
+
+        # Log interpretation
+        if behavior == "convergent":
+            logger.info(
+                "Interpretation: Training is STABLE - different initializations "
+                "converge to similar solutions"
+            )
+        else:
+            logger.info(
+                "Interpretation: Training is SENSITIVE - small differences in "
+                "initialization lead to different solutions"
+            )
 
         return results
 
@@ -498,10 +558,10 @@ class StabilityAnalyzer:
 
         Clears all recorded trajectories and model copies.
         """
+        old_checkpoints = self._n_checkpoints
         self._models = []
         self._trackers = []
         self._is_recording = False
         self._n_checkpoints = 0
 
-        if self._config.verbose:
-            print("Analyzer reset")
+        logger.info(f"Analyzer reset (cleared {old_checkpoints} checkpoints)")

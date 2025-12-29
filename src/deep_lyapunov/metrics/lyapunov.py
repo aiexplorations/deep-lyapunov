@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Tuple
 
 import numpy as np
+
+# Module-level logger
+logger = logging.getLogger(__name__)
 
 
 def compute_lyapunov_exponent(
@@ -51,6 +55,11 @@ def compute_lyapunov_exponent(
 
     # Lyapunov exponent: log of ratio normalized by time
     lyapunov = np.log(final_spread / initial_spread) / n_epochs
+
+    logger.debug(
+        f"Lyapunov exponent: {lyapunov:.4f} "
+        f"(initial={initial_spread:.4f}, final={final_spread:.4f}, epochs={n_epochs})"
+    )
 
     return float(lyapunov)
 

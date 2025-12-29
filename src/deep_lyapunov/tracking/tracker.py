@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 import numpy as np
 
 if TYPE_CHECKING:
     import torch.nn as nn
+
+# Module-level logger
+logger = logging.getLogger(__name__)
 
 
 class TrajectoryTracker:
