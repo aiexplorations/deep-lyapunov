@@ -154,8 +154,8 @@ class TestAnalysisResults:
         assert fig is not None
         plt.close(fig)
 
-    def test_save_report(self, sample_results):
-        """Test report generation."""
+    def test_save_report_html_embedded(self, sample_results):
+        """Test HTML report generation with embedded images (default)."""
         import matplotlib
 
         matplotlib.use("Agg")
@@ -163,18 +163,62 @@ class TestAnalysisResults:
         with tempfile.TemporaryDirectory() as tmpdir:
             sample_results.save_report(tmpdir)
 
+            # Check files were created - embedded means no PNG files
+            assert (Path(tmpdir) / "metrics.json").exists()
+            assert (Path(tmpdir) / "report.html").exists()
+
+            # PNG files should NOT exist when embedded
+            assert not (Path(tmpdir) / "trajectories.png").exists()
+            assert not (Path(tmpdir) / "convergence.png").exists()
+            assert not (Path(tmpdir) / "lyapunov.png").exists()
+
+            # Check HTML report contains embedded images
+            with open(Path(tmpdir) / "report.html") as f:
+                report = f.read()
+            assert "Stability Analysis Report" in report
+            assert "data:image/png;base64," in report  # Embedded images
+            assert "0.75" in report  # convergence ratio
+
+    def test_save_report_separate_images(self, sample_results):
+        """Test report generation with separate image files."""
+        import matplotlib
+
+        matplotlib.use("Agg")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_results.save_report(tmpdir, embed_images=False)
+
             # Check files were created
             assert (Path(tmpdir) / "trajectories.png").exists()
             assert (Path(tmpdir) / "convergence.png").exists()
             assert (Path(tmpdir) / "lyapunov.png").exists()
             assert (Path(tmpdir) / "metrics.json").exists()
+            assert (Path(tmpdir) / "report.html").exists()
+
+    def test_save_report_markdown_format(self, sample_results):
+        """Test markdown format report generation."""
+        import matplotlib
+
+        matplotlib.use("Agg")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_results.save_report(tmpdir, format="markdown")
+
+            # Check markdown file was created
             assert (Path(tmpdir) / "report.md").exists()
+            assert not (Path(tmpdir) / "report.html").exists()
 
             # Check markdown report content
             with open(Path(tmpdir) / "report.md") as f:
                 report = f.read()
-            assert "Stability Analysis Report" in report
-            assert "0.75" in report  # convergence ratio
+            assert "# Stability Analysis Report" in report
+
+    def test_save_report_invalid_path(self, sample_results):
+        """Test that file-like paths are rejected."""
+        import pytest
+
+        with pytest.raises(ValueError, match="looks like a file path"):
+            sample_results.save_report("my_report.json")
 
     def test_generate_markdown_report(self, sample_results):
         """Test markdown report generation."""

@@ -251,40 +251,109 @@ class AnalysisResults:
 
         return fig
 
-    def save_report(self, output_dir: str) -> None:
+    def save_report(
+        self,
+        output_dir: str,
+        embed_images: bool = True,
+        format: Literal["markdown", "html"] = "html",
+    ) -> None:
         """Generate and save a complete analysis report.
 
         Args:
             output_dir: Directory to save report files.
+            embed_images: If True, embed images as base64 in the report.
+                If False, save as separate PNG files with relative links.
+            format: Output format - 'html' (default) or 'markdown'.
         """
+        import base64
+        import io
+        import logging
+
         import matplotlib.pyplot as plt
 
+        logger = logging.getLogger(__name__)
+
         output_path = Path(output_dir)
+
+        # Validate output_dir doesn't look like a file path
+        if output_path.suffix in (".json", ".html", ".md", ".txt", ".png"):
+            raise ValueError(
+                f"output_dir '{output_dir}' looks like a file path (has extension "
+                f"'{output_path.suffix}'). Please provide a directory path instead."
+            )
+
         output_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Saving analysis report to: {output_path}")
 
-        # Save plots
-        fig = self.plot_trajectories()
-        fig.savefig(output_path / "trajectories.png", dpi=150, bbox_inches="tight")
-        plt.close(fig)
+        # Generate plots and optionally encode as base64
+        image_data = {}
+        plot_methods = [
+            ("trajectories", self.plot_trajectories),
+            ("convergence", self.plot_convergence),
+            ("lyapunov", self.plot_lyapunov),
+        ]
 
-        fig = self.plot_convergence()
-        fig.savefig(output_path / "convergence.png", dpi=150, bbox_inches="tight")
-        plt.close(fig)
+        for name, plot_fn in plot_methods:
+            fig = plot_fn()
 
-        fig = self.plot_lyapunov()
-        fig.savefig(output_path / "lyapunov.png", dpi=150, bbox_inches="tight")
-        plt.close(fig)
+            if embed_images:
+                # Save to buffer and encode as base64
+                buf = io.BytesIO()
+                fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
+                buf.seek(0)
+                image_data[name] = base64.b64encode(buf.read()).decode("utf-8")
+                buf.close()
+            else:
+                # Save as separate file
+                fig.savefig(output_path / f"{name}.png", dpi=150, bbox_inches="tight")
+
+            plt.close(fig)
 
         # Save metrics as JSON
         self.to_json(str(output_path / "metrics.json"))
+        logger.debug("Saved metrics.json")
 
-        # Generate markdown report
-        report = self._generate_markdown_report()
-        with open(output_path / "report.md", "w") as f:
+        # Generate and save report
+        if format == "html":
+            report = self._generate_html_report(image_data if embed_images else None)
+            report_file = output_path / "report.html"
+        else:
+            report = self._generate_markdown_report(
+                image_data if embed_images else None
+            )
+            report_file = output_path / "report.md"
+
+        with open(report_file, "w") as f:
             f.write(report)
 
-    def _generate_markdown_report(self) -> str:
-        """Generate a markdown summary report."""
+        logger.info(
+            f"Report saved: {report_file} "
+            f"({'images embedded' if embed_images else 'images as separate files'})"
+        )
+
+    def _generate_markdown_report(
+        self, image_data: Optional[Dict[str, str]] = None
+    ) -> str:
+        """Generate a markdown summary report.
+
+        Args:
+            image_data: Optional dict mapping image names to base64 data.
+                If provided, images are embedded as data URIs.
+        """
+        # Create image references - embedded or file-based
+        if image_data:
+            traj_img = (
+                f"![Trajectories](data:image/png;base64,{image_data['trajectories']})"
+            )
+            conv_img = (
+                f"![Convergence](data:image/png;base64,{image_data['convergence']})"
+            )
+            lyap_img = f"![Lyapunov](data:image/png;base64,{image_data['lyapunov']})"
+        else:
+            traj_img = "![Trajectories](trajectories.png)"
+            conv_img = "![Convergence](convergence.png)"
+            lyap_img = "![Lyapunov](lyapunov.png)"
+
         return f"""# Stability Analysis Report
 
 ## Summary
@@ -304,13 +373,13 @@ class AnalysisResults:
 
 ## Visualizations
 
-![Trajectories](trajectories.png)
+{traj_img}
 *Weight trajectories in PCA space. Circles = start, Squares = end.*
 
-![Convergence](convergence.png)
+{conv_img}
 *Evolution of trajectory spread during training.*
 
-![Lyapunov](lyapunov.png)
+{lyap_img}
 *Local Lyapunov exponents at each checkpoint.*
 
 ## Interpretation
@@ -321,6 +390,176 @@ class AnalysisResults:
 
 ---
 *Generated by deep-lyapunov*
+"""
+
+    def _generate_html_report(self, image_data: Optional[Dict[str, str]] = None) -> str:
+        """Generate an HTML report with embedded images.
+
+        Args:
+            image_data: Optional dict mapping image names to base64 data.
+                If provided, images are embedded as data URIs.
+        """
+        # Create image tags - embedded or file-based
+        if image_data:
+            traj_img = f'<img src="data:image/png;base64,{image_data["trajectories"]}" alt="Trajectories" style="max-width:100%;">'
+            conv_img = f'<img src="data:image/png;base64,{image_data["convergence"]}" alt="Convergence" style="max-width:100%;">'
+            lyap_img = f'<img src="data:image/png;base64,{image_data["lyapunov"]}" alt="Lyapunov" style="max-width:100%;">'
+        else:
+            traj_img = '<img src="trajectories.png" alt="Trajectories" style="max-width:100%;">'
+            conv_img = (
+                '<img src="convergence.png" alt="Convergence" style="max-width:100%;">'
+            )
+            lyap_img = '<img src="lyapunov.png" alt="Lyapunov" style="max-width:100%;">'
+
+        behavior_color = "#28a745" if self.behavior == "convergent" else "#dc3545"
+        behavior_label = "Convergent" if self.behavior == "convergent" else "Divergent"
+
+        interpretation = (
+            "Training is <strong>stable</strong>: different initializations converge to similar solutions. "
+            "This architecture is suitable for production deployment where reproducibility is important."
+            if self.behavior == "convergent"
+            else "Training is <strong>sensitive</strong>: small initialization differences lead to distinct solutions. "
+            "Consider using ensemble methods to leverage this diversity, or investigate if hyperparameters need tuning."
+        )
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stability Analysis Report</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }}
+        h1 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
+        h2 {{ color: #34495e; margin-top: 30px; }}
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        th, td {{
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }}
+        th {{ background-color: #3498db; color: white; }}
+        tr:hover {{ background-color: #f5f5f5; }}
+        .metric-value {{ font-weight: bold; font-family: monospace; }}
+        .behavior-badge {{
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            background-color: {behavior_color};
+        }}
+        .config-list {{ list-style: none; padding: 0; }}
+        .config-list li {{
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }}
+        .config-list li:last-child {{ border-bottom: none; }}
+        .viz-container {{
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }}
+        .viz-container img {{ max-width: 100%; height: auto; }}
+        .viz-caption {{
+            font-style: italic;
+            color: #666;
+            margin-top: 10px;
+        }}
+        .interpretation {{
+            background: white;
+            padding: 20px;
+            border-left: 4px solid {behavior_color};
+            margin: 20px 0;
+        }}
+        footer {{
+            text-align: center;
+            color: #888;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }}
+    </style>
+</head>
+<body>
+    <h1>Stability Analysis Report</h1>
+
+    <h2>Summary</h2>
+    <p>Training behavior: <span class="behavior-badge">{behavior_label}</span></p>
+
+    <table>
+        <tr>
+            <th>Metric</th>
+            <th>Value</th>
+            <th>Interpretation</th>
+        </tr>
+        <tr>
+            <td>Convergence Ratio</td>
+            <td class="metric-value">{self.convergence_ratio:.3f}x</td>
+            <td>{"Trajectories merge over time" if self.convergence_ratio < 1 else "Trajectories separate over time"}</td>
+        </tr>
+        <tr>
+            <td>Lyapunov Exponent</td>
+            <td class="metric-value">{self.lyapunov:.4f}</td>
+            <td>{"Stable training (λ < 0)" if self.lyapunov < 0 else "Sensitive to initialization (λ > 0)"}</td>
+        </tr>
+        <tr>
+            <td>Effective Dimensionality</td>
+            <td class="metric-value">{self.effective_dimensionality:.1f}</td>
+            <td>Degrees of freedom in weight dynamics</td>
+        </tr>
+    </table>
+
+    <h2>Configuration</h2>
+    <ul class="config-list">
+        <li><strong>Trajectories analyzed:</strong> {self.n_trajectories}</li>
+        <li><strong>Checkpoints recorded:</strong> {self.n_checkpoints}</li>
+        <li><strong>Total parameters:</strong> {self.n_parameters:,}</li>
+    </ul>
+
+    <h2>Visualizations</h2>
+
+    <div class="viz-container">
+        {traj_img}
+        <p class="viz-caption">Weight trajectories in PCA space. Circles = start, Squares = end.</p>
+    </div>
+
+    <div class="viz-container">
+        {conv_img}
+        <p class="viz-caption">Evolution of trajectory spread during training.</p>
+    </div>
+
+    <div class="viz-container">
+        {lyap_img}
+        <p class="viz-caption">Local Lyapunov exponents at each checkpoint.</p>
+    </div>
+
+    <h2>Interpretation</h2>
+    <div class="interpretation">
+        <p>{interpretation}</p>
+    </div>
+
+    <footer>
+        Generated by <a href="https://github.com/aiexplorations/deep-lyapunov">deep-lyapunov</a>
+    </footer>
+</body>
+</html>
 """
 
     def to_dict(self) -> Dict[str, Any]:
